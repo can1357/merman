@@ -519,6 +519,7 @@ pub(crate) fn prepare_sequence_diagram_typed_with_title_and_work_meter(
         diagram_title,
         nodes: &nodes,
         edges: &edges,
+        block_layouts_by_id: &block_layouts_by_id,
         bounds_start_x,
         bounds_stop_x,
         actor_index: &actor_index,

@@ -3866,3 +3866,29 @@ fn sequence_family_fonts_match_measurement_and_svg_with_falsy_or_string_global_s
         }
     }
 }
+
+#[test]
+fn sequence_root_bounds_keep_trailing_block_bottom_without_mirrored_actors() {
+    // Mermaid `sequenceRenderer.ts` bumps the bounds cursor to `loopModel.stopy` after every
+    // block end, so a trailing control frame stays inside the root viewBox even when no footer
+    // actors are drawn.
+    for box_margin in [10.0, 8.0] {
+        let config = serde_json::json!({
+            "sequence": {"mirrorActors": false, "boxMargin": box_margin}
+        });
+        let svg = render_sequence_svg_from_text(&format!(
+            "---\nconfig: {config}\n---\nsequenceDiagram\n  A->>B: hi\n  loop every minute\n    B->>A: ok\n  end"
+        ));
+        let frame_bottom = extract_self_closing_tags(&svg, "line")
+            .into_iter()
+            .filter(|tag| tag.contains("loopLine"))
+            .filter_map(|tag| attr_f64(tag, "y2"))
+            .fold(f64::NEG_INFINITY, f64::max);
+        let ([_, min_y, _, height], _) = root_view_box_and_max_width(&svg);
+        assert_eq!(
+            min_y + height,
+            frame_bottom + 10.0,
+            "boxMargin {box_margin}: root viewBox must end diagramMarginY below the loop frame"
+        );
+    }
+}

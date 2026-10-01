@@ -4,7 +4,7 @@ use super::message_metrics::{SequenceMessageMetricView, SequenceMessageOwner};
 use super::metrics::{SequenceMathHeightMode, measure_sequence_label_for_layout};
 use crate::Result;
 use crate::math::MathRenderer;
-use crate::model::{Bounds, LayoutEdge, LayoutNode};
+use crate::model::{Bounds, LayoutEdge, LayoutNode, SequenceBlockLayout};
 use crate::text::{TextMeasurer, TextStyle};
 use merman_core::MermaidConfig;
 use merman_core::diagrams::sequence::{SequenceDiagramRenderModel, SequenceMessageKind};
@@ -15,6 +15,7 @@ pub(super) struct SequenceRootBoundsContext<'a> {
     pub(super) diagram_title: Option<&'a str>,
     pub(super) nodes: &'a [LayoutNode],
     pub(super) edges: &'a [LayoutEdge],
+    pub(super) block_layouts_by_id: &'a rustc_hash::FxHashMap<String, SequenceBlockLayout>,
     pub(super) bounds_start_x: f64,
     pub(super) bounds_stop_x: f64,
     pub(super) actor_index: &'a HashMap<&'a str, usize>,
@@ -108,6 +109,13 @@ fn sequence_content_bounds(ctx: &SequenceRootBoundsContext<'_>) -> Result<Conten
     include_footer_row_height(&mut content, ctx)?;
 
     if !ctx.mirror_actors {
+        // Mermaid `sequenceRenderer.ts` ends every control block with `bounds.endLoop()` and
+        // `bounds.bumpVerticalPos(loopModel.stopy - bounds.getVerticalPos())`, which raises
+        // `bounds.data.stopy` to the frame bottom. Without footer actors nothing else covers a
+        // trailing block, so include each block's stop explicitly.
+        for block in ctx.block_layouts_by_id.values() {
+            content.include_y(block.stop_y);
+        }
         for (edge_index, e) in ctx.edges.iter().enumerate() {
             ctx.checkpoints.checkpoint_loop(edge_index)?;
             if e.id.starts_with("lifeline-") {
